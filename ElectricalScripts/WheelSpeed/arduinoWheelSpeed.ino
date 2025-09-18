@@ -3,7 +3,11 @@
 // 1 magnet on the rotating shaft
 // Prints RPM to Serial Monitor
 
+# include "SevSeg.h"
+SevSeg sevseg;
+
 const int hallPin = 2;   // Hall effect sensor pin
+const int analogPin = A0;
 const int rpmAvgTime = 2000; //ms
 volatile int timedCount = rpmAvgTime;
 
@@ -14,15 +18,25 @@ volatile unsigned long risingTime = 0;
 volatile unsigned long fallingTime = 0;
 volatile int pulseCount  = 0;
 
-const unsigned long debounceDelay = 60;  // ms (adjust if needed)
+volatile int check = 0;
+
+const unsigned long debounceDelay = 27;  // ms (adjust if needed)
+
+byte numDigits = 4;
+byte digitPins[] = {1,3,4,5};
+byte segmentPins[] = {6,7,8,9,10,11,12,13};
+bool resistorsOnSegments = 0;
 
 void setup() {
-  Serial.begin(9600);
+  // Serial.begin(9600);
   pinMode(hallPin, INPUT);
 
   // Trigger on rising edge (magnet detected)
-  attachInterrupt(digitalPinToInterrupt(hallPin), hallRising, RISING);
+  attachInterrupt(digitalPinToInterrupt(hallPin), hallRising, 2);
   // attachInterrupt(digitalPinToInterrupt(hallPin), hallFalling, FALLING);
+
+  sevseg.begin(COMMON_CATHODE, numDigits, digitPins, segmentPins, resistorsOnSegments);
+  sevseg.setBrightness(90);
 }
 
 void loop() {
@@ -38,32 +52,36 @@ void loop() {
   // Compute RPM: 60,000 ms/min / interval (ms)
   float rpm = 60000.0 / interval;
   
+  // bool check = digitalRead(hallPin);
 
-  Serial.print("Pulse Interval (ms): ");
-  Serial.print(interval);
-  Serial.print("  -> Instant RPM: ");
-  Serial.println(rpm);
-
-  if (timedCount == 0) {
-    int timedRPM = pulseCount*(60*60000.0/rpmAvgTime);
-    pulseCount = 0;
-    Serial.print(" -> Timed RPM: ");
-    Serial.println(timedRPM);
-  }
+  // if(check == 1){
+  //   Serial.print(analogRead(analogPin));
+  //   Serial.print(",");
+  //   Serial.println(digitalRead(hallPin));
+  // }
+  // Serial.print("Pulse Interval (ms): ");
+  // Serial.print(interval);
+  // Serial.print("  -> Instant RPM: ");
+  // Serial.println(rpm);
   
 
   timedCount = rpmAvgTime - 500;
-  delay(500); // update twice per second
+  // delay(500); // update twice per second
   // }
+  sevseg.setNumber(rpm,0);
+  sevseg.refreshDisplay();
+  // delay(1000);
 }
 
 void hallRising() {
   unsigned long now = millis();
-
+  check = 1;
+  // Serial.print(".");
   // Debounce: ignore pulses that are too close together
   if (now - fallingTime > debounceDelay) {
-
+    // Serial.print("update");
     pulseInterval = now - risingTime;
+    
     lastPulseTime = now;
     risingTime = now;
     fallingTime = now;
